@@ -42,21 +42,23 @@
             return group[t];
         }
 
+        // getIconStyle(class,type)
         function getIconStyle(c, t) {
+            // If either is unavailable show as unknown
             if (typeof t === "undefined" || typeof c === "undefined") {
                 return "/static/images/unknown.png"
             }
-            else if (t === "pi") {
+            else if (t === "pi") { // map.cgi will tag Pi's based on mac address
                 return "/static/images/raspberrypi.png"
-            } else if (c === "infra") {
+            } else if (c === "infra") { // Infrastucture
                 return "/static/images/infra.png"
-            } else if (c === "nas" && t === "physical") {
+            } else if (c === "nas" && t === "physical") { 
                 return "/static/images/nas.png"
             } else if (t === "physical") {
                 return "/static/images/server.png"
             } else if (t === "vm") {
                 return "/static/images/vm.png"
-            } else { return "/static/images/unknown.png" }
+            } else { return "/static/images/unknown.png" } // Fallback
         }
 
         // Called when the Visualization API is loaded.
@@ -70,33 +72,43 @@
             // Create a data table with links.
             edges = [];
 
-
+            // For Data returned from map.cgi
             for (let i = 0; i < data.length; i++) {
                 h = data[i]
-                nodes.push({ id: i, label: h.hostname, label: h.hostname, uplink: h.uplink, group: getGroupID(h.class + h.type), shape: 'image', image: getIconStyle(h.class, h.type), title: "<ul class='list-group list-group-flush'><li class='list-group-item d-flex justify-content-between align-items-center active'>Hostname" + h.hostname + "</li><li class='list-group-item d-flex justify-content-between align-items-center'>Class<span class='badge badge-primary badge-pill'>" + h.class + "</span></li><li class='list-group-item d-flex justify-content-between align-items-center'>Type <span class='badge badge-primary badge-pill'>" + h.type + "</span></li></ul>", raw: h })
+                // add the system to the ndoes
+                nodes.push({ 
+                    id: i, 
+                    label: h.hostname, 
+                    label: h.hostname, 
+                    uplink: h.uplink, 
+                    group: getGroupID(h.class + h.type), 
+                    shape: 'image', 
+                    image: getIconStyle(h.class, h.type), 
+                    title: "<ul class='list-group list-group-flush'><li class='list-group-item d-flex justify-content-between align-items-center active'>Hostname" + h.hostname + "</li><li class='list-group-item d-flex justify-content-between align-items-center'>Class<span class='badge badge-primary badge-pill'>" + h.class + "</span></li><li class='list-group-item d-flex justify-content-between align-items-center'>Type <span class='badge badge-primary badge-pill'>" + h.type + "</span></li></ul>", 
+                    raw: h 
+                })
             }
+
+            // Lets link it all together
             for (let i = 0; i < nodes.length; i++) {
                 n = nodes[i]
+                // Find the node id of the specified uplink
                 uplinkid = nodes.find(function (e, i, a) {
                     if (n.uplink === e.label) {
                         return e.id
                     }
                 })
+
                 if (typeof (uplinkid) !== "undefined") {
+                    // Direct to the internet is top level
                     if(uplinkid.label==="theinternet" && n.raw.class!=="infra") {
                         edges.push({ from: n.id, to: uplinkid.id,dashes:true, arrows: { to: { enabled: true} } } )
                     } else {
                         edges.push({ from: n.id, to: uplinkid.id, arrows: { to: { enabled: true} } } )
                     }
-                    
                 }
+                // Else just display the node unlinked to the network
             }
-
-
-            //   for (var i = 4; i <= 7; i++) {
-            //     nodes.push({id: i, label: 'Computer', image: DIR + 'Hardware-My-Computer-3-icon.png', shape: 'image'});
-            //     edges.push({from: 2, to: i, length: EDGE_LENGTH_SUB});
-            //   }
 
             // create a network
             var container = document.getElementById('mynetwork');
@@ -110,10 +122,6 @@
                     shapeProperties: {
                         useBorderWithImage: true
                     },
-                    /*                    color: {
-                                                                    border: '#406897',
-                                                                    background: '#6AAFFF'
-                                                            }*/
                 },
                 edges: {
                     smooth: {
@@ -130,26 +138,33 @@
                     hierarchical: {
                         enabled: true,
                         direction: "DU",
-                        sortMethod: "directed"
+                        sortMethod: "hubsize"
                     }
                 }
             };
             network = new vis.Network(container, data, options);
         }
-        a_data = ""
-        d.then(function () { draw(d.responseJSON); a_data = d.responseJSON.hash });
+        a_data = "" // Use a_data to hold the hash of the displayed data
+
+        // Resolve the promise of the data from map.cgi
+        d.then(function () { 
+            draw(d.responseJSON); // Send the data to visjs
+            a_data = d.responseJSON.hash; // Update the hash of the displayed data
+        });
+
+        // Check for updates every 30 seconds
         setInterval(function () {
             temp_d = $.getJSON("/cgi-bin/map.cgi");
             temp_d.then(function () {
                 if (a_data !== temp_d.responseJSON.hash) {
-                    console.log("" + d.responseJSON.hash + " NOT " + temp_d.responseJSON.hash)
+                    console.debug("" + d.responseJSON.hash + " NOT " + temp_d.responseJSON.hash)
                     draw(temp_d.responseJSON)
                     a_data = temp_d.responseJSON.hash;
                 } else {
-                    console.log("same")
+                    console.debug("same")
                 }
             });
-        }, 3000)
+        }, 30000)
     </script>
 </head>
 
