@@ -49,6 +49,7 @@ def getFileHash(file):
     return md5.hexdigest()
 
 def main():
+    ## Dist is RO FS. Need to copy to /tmp because somehow a select is a RW op
     copyfile("/mnt/dist/core/hostdata.db", "/tmp/hostdata.db")
     conn = create_connection("/tmp/hostdata.db")
     http = create_httppool()
@@ -63,8 +64,11 @@ def main():
             # print (temp)
             db_data=fetchHostData(conn,temp[3])
             if db_data is None:
+                ## Check for VMWare hosts
                 if "00:0c:29:" not in temp[1]:
                     db_data=(None,None,None,"sw-01",None)
+                elif "dc:a6:32" in temp[1] or "b8:27:eb" in temp[1]:
+                    db_data("server","raspbian",None,"sw-01","pi")
                 else:
                     db_data=("server",None,None,"olympus","vm")
             if temp[3] is "*":
