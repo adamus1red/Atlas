@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Network | Images</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <style type="text/css">
+        #mynetwork {
+            width: 100%;
+            height: 800px;
+            border: 1px solid lightgray;
+        }
+    </style>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+        integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+        crossorigin="anonymous"></script>
+    <!--<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js" integrity="sha384-xrRywqdh3PHs8keKZN+8zzc5TX0GRTLCcmivcbNJWm2rs5C8PRhcEn3czEjhAO9o" crossorigin="anonymous"></script>-->
+    <script type="text/javascript" src="https://visjs.github.io/vis-network/dist/vis-network.min.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <link href="https://visjs.github.io/vis-network/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <link href="/static/fontawesome/css/all.css" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript">
+        var nodes = null;
+        var edges = null;
+        var network = null;
+        var group = [];
+        var group_count = 0;
+
+        var DIR = '../img/refresh-cl/';
+        //  var EDGE_LENGTH_MAIN = 150;
+        //var EDGE_LENGTH_SUB = 50;
+
+        function getGroupID(t) {
+            if (typeof group[t] === "undefined") {
+                group[t] = group_count;
+                group_count++;
+            }
+            return group[t];
+        }
+
+        function getIconStyle(c, t) {
+            if (typeof t === "undefined" || typeof c === "undefined") {
+                return "/static/images/unknown.png"
+            }
+            else if (t === "pi") {
+                return "/static/images/raspberrypi.png"
+            } else if (c === "infra") {
+                return "/static/images/infra.png"
+            } else if (c === "nas" && t === "physical") {
+                return "/static/images/nas.png"
+            } else if (t === "physical") {
+                return "/static/images/server.png"
+            } else if (t === "vm") {
+                return "/static/images/vm.png"
+            } else { return "/static/images/unknown.png" }
+        }
+
+        // Called when the Visualization API is loaded.
+        d = $.getJSON("/cgi-bin/map.cgi");
+        function draw(d) {
+
+            var data = d.data
+            // Create a data table with nodes.
+            nodes = [];
+
+            // Create a data table with links.
+            edges = [];
+
+
+            for (let i = 0; i < data.length; i++) {
+                h = data[i]
+                nodes.push({ id: i, label: h.hostname, label: h.hostname, uplink: h.uplink, group: getGroupID(h.class + h.type), shape: 'image', image: getIconStyle(h.class, h.type), title: "<ul class='list-group list-group-flush'><li class='list-group-item d-flex justify-content-between align-items-center active'>Hostname" + h.hostname + "</li><li class='list-group-item d-flex justify-content-between align-items-center'>Class<span class='badge badge-primary badge-pill'>" + h.class + "</span></li><li class='list-group-item d-flex justify-content-between align-items-center'>Type <span class='badge badge-primary badge-pill'>" + h.type + "</span></li></ul>", raw: h })
+            }
+            for (let i = 0; i < nodes.length; i++) {
+                n = nodes[i]
+                uplinkid = nodes.find(function (e, i, a) {
+                    if (n.uplink === e.label) {
+                        return e.id
+                    }
+                })
+                if (typeof (uplinkid) !== "undefined") {
+                    if(uplinkid.label==="theinternet" && n.raw.class!=="infra") {
+                        edges.push({ from: n.id, to: uplinkid.id,dashes:true, arrows: { to: { enabled: true} } } )
+                    } else {
+                        edges.push({ from: n.id, to: uplinkid.id, arrows: { to: { enabled: true} } } )
+                    }
+                    
+                }
+            }
+
+
+            //   for (var i = 4; i <= 7; i++) {
+            //     nodes.push({id: i, label: 'Computer', image: DIR + 'Hardware-My-Computer-3-icon.png', shape: 'image'});
+            //     edges.push({from: 2, to: i, length: EDGE_LENGTH_SUB});
+            //   }
+
+            // create a network
+            var container = document.getElementById('mynetwork');
+            var data = {
+                nodes: nodes,
+                edges: edges
+            };
+            var options = {
+                nodes: {
+                    borderWidth: 4,
+                    shapeProperties: {
+                        useBorderWithImage: true
+                    },
+                    /*                    color: {
+                                                                    border: '#406897',
+                                                                    background: '#6AAFFF'
+                                                            }*/
+                },
+                edges: {
+                    smooth: {
+                        type: 'cubicBezier',
+                        forceDirection: "horizontal",
+                        roundness: 0.4
+                    }
+                },
+                interaction: {
+                    dragNodes: true,
+                    hover: true
+                },
+                layout: {
+                    hierarchical: {
+                        enabled: true,
+                        direction: "DU",
+                        sortMethod: "directed"
+                    }
+                }
+            };
+            network = new vis.Network(container, data, options);
+        }
+        a_data = ""
+        d.then(function () { draw(d.responseJSON); a_data = d.responseJSON.hash });
+        setInterval(function () {
+            temp_d = $.getJSON("/cgi-bin/map.cgi");
+            temp_d.then(function () {
+                if (a_data !== temp_d.responseJSON.hash) {
+                    console.log("" + d.responseJSON.hash + " NOT " + temp_d.responseJSON.hash)
+                    draw(temp_d.responseJSON)
+                    a_data = temp_d.responseJSON.hash;
+                } else {
+                    console.log("same")
+                }
+            });
+        }, 3000)
+    </script>
+</head>
+
+<body>
+
+    <div class="container-fluid">
+        <h1 class="h2">Network Map</h1>
+        <div id="mynetwork"></div>
+    </div>
+
+</body>
+
+</html>
